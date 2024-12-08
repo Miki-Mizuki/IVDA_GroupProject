@@ -27,6 +27,9 @@ export const tokens = (mode) => ({
           800: "#080b12",
           900: "#040509",
         },
+        secondary: {
+          500: mode === "dark" ? "#be185d" : "#2a2f33",
+        },
         greenAccent: {
           100: "#dbf5ee",
           200: "#b7ebde",
@@ -83,6 +86,9 @@ export const tokens = (mode) => ({
           700: "#727681",
           800: "#a1a4ab",
           900: "#d0d1d5",
+        },
+        secondary: {
+          500: mode === "dark" ? "#f1bbc9" : "#f1bbc9",
         },
         greenAccent: {
           100: "#0f2922",

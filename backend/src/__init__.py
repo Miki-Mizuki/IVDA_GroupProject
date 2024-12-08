@@ -45,9 +45,12 @@
 
 # __init__.py
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
-from .model import get_all_users, get_user_by_id, get_user_by_id_sc, get_visualization_data
+from .model import get_all_users, get_user_by_id, get_user_by_id_sc
+from .model import get_visualization_data, get_time_distribution, get_category_distribution_by_cluster
+from .model import get_scatter_plot_aggregated
+from .model import get_visualization_data_interactive
 
 app = Flask(__name__)
 CORS(app)
@@ -75,8 +78,28 @@ def users_sim_cluster(informfully_id):
     
 @app.route('/visualization', methods=['GET'])
 def visualization():
-    data = get_visualization_data()
+    # data = get_visualization_data()
+    data = get_visualization_data_interactive(theta_chosen = request.args.get('theta_chosen', 'alpha'), radius_chosen = request.args.get('radius_chosen', 'pca'))
     return jsonify(data)
+
+@app.route('/histogram_data', methods=['GET'])
+def get_histogram_data():
+    """
+    Endpoint to get the distribution of article access times.
+    """
+    data = get_time_distribution()
+    return jsonify(data)
+
+@app.route('/category_distribution_by_cluster', methods=['GET'])
+def category_distribution_by_cluster():
+    response = get_category_distribution_by_cluster()
+    return jsonify(response)
+
+@app.route('/scatter_plot', methods=['GET'])
+def scatter_plot():
+    response = get_scatter_plot_aggregated()
+    return jsonify(response)
+
 
 if __name__ == '__main__':
     app.run(debug=True)

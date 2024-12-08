@@ -2,6 +2,7 @@ from pymongo import MongoClient
 from typing import List, Optional
 from bson import ObjectId
 import numpy as np
+import pandas as pd
 
 class Bookmark: 
     '''
@@ -254,6 +255,13 @@ users_collection = db['users_integrated']
 '''
 users_collection_sc = db['users_sim_cluster']
 
+users_collection_sc_raw = db['users_raw_data']
+
+users_time_distribution = db['users_time_distribution']
+
+for_clock = db['forClock']
+
+
 def get_all_users():
     users_data = users_collection.find()
     users = [User(data) for data in users_data]
@@ -280,7 +288,6 @@ def get_visualization_data():
 
     visualization_data = []
     for item in data:
-        
         cluster = item.get('cluster', 0)
         
         avg_time = item.get('alpha', 0)
@@ -299,6 +306,109 @@ def get_visualization_data():
             "cluster": cluster
         })
 
-    # print(visualization_data)
-    
     return visualization_data
+
+def get_visualization_data_interactive(theta_chosen: str, radius_chosen: str):
+    data = list(for_clock.find({}, no_cursor_timeout=True))
+
+    visualization_data = []
+
+    for item in data:
+        cluster = item.get('cluster', 0)
+
+        time = item.get(theta_chosen, 0)
+        theta = np.deg2rad(time / 3600 / 24 * 360)
+
+        radius = item.get(radius_chosen, 0)
+
+        visualization_data.append({
+            "theta": theta,
+            "radius": radius,
+            "cluster": cluster,
+        })
+
+    return visualization_data
+
+def get_time_distribution():
+    clusters = users_time_distribution.aggregate([
+        {
+            "$group": {
+                "_id": "$cluster",
+                "avg_duration": {"$avg": "$avg_duration"},
+                "avg_maxscroll": {"$avg": "$avg_maxscroll"},
+                "rush_hour_count": {"$sum": "$rush_hour"},
+                "bedtime_count": {"$sum": "$bedtime"},
+                "work_hour_count": {"$sum": "$work_hour"},
+                "weekend_count": {"$sum": "$weekend"}
+            }
+        }
+    ])
+
+    distribution = []
+    for cluster in clusters:
+        distribution.append({
+            "cluster": cluster["_id"],
+            "avg_duration": cluster["avg_duration"],
+            "avg_maxscroll": cluster["avg_maxscroll"],
+            "rush_hour": cluster["rush_hour_count"],
+            "bedtime": cluster["bedtime_count"],
+            "work_hour": cluster["work_hour_count"],
+            "weekend": cluster["weekend_count"]
+        })
+
+    return distribution
+
+def get_category_distribution_by_cluster():
+    # 定义目标分类列表
+    target_categories = {
+        "business", "crime", "entertainment&arts", "football", "health",
+        "lifeandstyle", "politics", "science", "sport", "technology",
+        "uk news", "world news", "environment", "others"
+    }
+    
+    # 提取 clusters 信息
+    clusters = {user['informfully_id']: user['cluster'] for user in users_collection_sc.find({}, {'informfully_id': 1, 'cluster': 1})}
+    users = users_collection.find({}, {'informfully_id': 1, 'views': 1})
+
+    category_distribution = {}
+
+    for user in users:
+        informfully_id = user.get('informfully_id')
+        views = user.get('views', [])
+        cluster = clusters.get(informfully_id, 'Unknown')
+
+        # 初始化 cluster 分类统计
+        if cluster not in category_distribution:
+            category_distribution[cluster] = {}
+
+        for view in views:
+            category = view.get('primaryCategory', 'Unknown')
+            if category is not None:
+                category = category.lower()  # 转换为小写便于匹配
+            else:
+                category = 'unknown'  # 如果为 None，则设为 "unknown"
+
+            # 将 'news' 和 'News' 归类为 'world news'
+            if category in {'news', 'News'}:
+                category = 'world news'
+            elif category not in target_categories:  # 非目标分类时归为 others
+                category = 'others'
+
+            if category not in category_distribution[cluster]:
+                category_distribution[cluster][category] = 0
+            category_distribution[cluster][category] += 1
+
+    response = []
+    for cluster, categories in category_distribution.items():
+        # 确保所有键为字符串
+        cleaned_categories = {str(key): value for key, value in categories.items()}
+        response.append({
+            "cluster": cluster,
+            "categories": cleaned_categories
+        })
+    
+    return response
+
+def get_scatter_plot_aggregated():
+    data = list(db['processed_data_update'].find({}, {"_id": 0}))
+    return data
